@@ -1,0 +1,27 @@
+# NOTE: PyTorch must be installed separately FIRST with the correct CUDA index
+# (see setup-windows.ps1 or README). Do not pip-install torch from this file —
+# you'll get the CPU build by accident.
+
+# Diffusion stack
+diffusers>=0.30.0
+transformers>=4.44.0
+accelerate>=0.33.0
+safetensors>=0.4.5
+peft>=0.12.0          # required for LoRA loading/unloading
+controlnet-aux>=0.0.9 # OpenPose preprocessor
+
+# HTTP server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+
+# Image + config
+Pillow>=10.4.0
+PyYAML>=6.0.2
+
+# CLI client (used by scripts/cli.py from either machine)
+requests>=2.32.0
+
+# Memory-efficient attention. Optional but recommended on RTX 40-series.
+# If install fails on Windows, comment this out — the pipeline will fall back.
+# xformers

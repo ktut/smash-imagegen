@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Project outputs
+outputs/
+!outputs/.gitkeep
+
+# LoRA weights (large, downloaded/trained per-machine)
+loras/*.safetensors
+
+# HF cache (sometimes lives in repo if HF_HOME is set there)
+.cache/
+huggingface/

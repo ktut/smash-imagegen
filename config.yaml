@@ -1,0 +1,33 @@
+# smash-imagegen configuration.
+# Models are downloaded from Hugging Face on first run and cached locally
+# (~/.cache/huggingface/ by default). Total ~15-20GB.
+
+# Server bind address. 0.0.0.0 = accept LAN connections from your Mac.
+host: 0.0.0.0
+port: 8000
+
+# Base diffusion model. SDXL 1.0 is the sweet spot for IP-Adapter + ControlNet
+# maturity and 16GB VRAM headroom.
+base_model: stabilityai/stable-diffusion-xl-base-1.0
+
+# Patched VAE — the default SDXL VAE is broken in fp16 (produces black images).
+# This drop-in fix is required, not optional.
+vae_model: madebyollin/sdxl-vae-fp16-fix
+
+# ControlNet for pose conditioning. xinsir's is the strongest open OpenPose
+# ControlNet for SDXL as of 2025.
+controlnet_openpose_model: xinsir/controlnet-openpose-sdxl-1.0
+
+# IP-Adapter for identity reference (the nano-banana analog).
+# "Plus" variants give stronger image conditioning than the base.
+ip_adapter:
+  repo: h94/IP-Adapter
+  subfolder: sdxl_models
+  weight_name: ip-adapter-plus_sdxl_vit-h.safetensors
+
+# Pose detector for the pose_extract=True path
+pose_detector_repo: lllyasviel/Annotators
+
+# Local filesystem paths (relative to repo root, or absolute)
+loras_dir: loras
+outputs_dir: outputs
