@@ -53,15 +53,25 @@ python -m uvicorn server.main:app --host 0.0.0.0 --port 8000 --reload
 pipeline is loaded once at startup (`lifespan` in `main.py`). To pick up
 config.yaml changes you must restart the server.
 
+## Network setup
+
+The server runs on the Windows PC at `192.168.1.103:8000`. On the Mac,
+`gaming-pc` is mapped to that IP in `/etc/hosts`, so all commands use
+`http://gaming-pc:8000`.
+
 ## Testing changes
 
 There's no test suite yet (this is a small project). The minimum smoke test
-after any change:
+after any change (run from the Mac):
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/config
-python scripts/cli.py --prompt "test image, simple sphere, plain background" --seed 1
+curl http://gaming-pc:8000/health
+curl http://gaming-pc:8000/config
+curl -s -X POST http://gaming-pc:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "pixel-art fighter, idle pose, side view, 2D sprite, plain background", "seed": 1}' \
+  | python3 -c "import sys,json,base64; d=json.load(sys.stdin); open('/tmp/test.png','wb').write(base64.b64decode(d['image_base64'])); print(d['seed_used'])"
+open /tmp/test.png
 ```
 
 Then visually inspect the output.
