@@ -72,7 +72,17 @@ def _force_background_color(
     edge_labels.update(np.unique(labelled[:, -1]).tolist())
     edge_labels.discard(0)
 
-    bg_mask = np.isin(labelled, list(edge_labels))
+    # Safety guard: if a component is connected to the image edge AND also
+    # crosses the centre vertical strip, it's almost certainly bridging from
+    # the bg into the character (e.g. the flood-fill jumped from an olive bg
+    # corner across olive-toned skin). Refuse to fill those components.
+    centre_x0 = int(w * 0.40)
+    centre_x1 = int(w * 0.60)
+    centre_labels = set(np.unique(labelled[:, centre_x0:centre_x1]).tolist())
+    centre_labels.discard(0)
+
+    bg_labels = edge_labels - centre_labels
+    bg_mask = np.isin(labelled, list(bg_labels))
 
     target = np.array(
         [int(hex_color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)], dtype=np.uint8
