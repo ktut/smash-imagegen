@@ -84,6 +84,21 @@ class GenerateRequest(BaseModel):
         le=255,
         description="Per-channel tolerance for the flood-fill match against the sampled corner colour.",
     )
+    outline_color: Optional[str] = Field(
+        default=None,
+        description=(
+            "If set (e.g. '#000000'), the server strokes a solid border in this "
+            "colour around the character silhouette after the bg fill. The border "
+            "is `outline_width` pixels of character that touch the bg region. "
+            "Requires force_background_color to be set as well."
+        ),
+    )
+    outline_width: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Thickness (in pixels) of the silhouette outline stroke.",
+    )
 
     # ---- Generation params ----
     seed: int = Field(default=-1, description="-1 for random")

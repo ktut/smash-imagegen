@@ -40,9 +40,32 @@ def _encode_b64(img: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
+def _stroke_silhouette(
+    img: Image.Image, bg_mask, hex_color: str, width: int
+) -> Image.Image:
+    """Paint a `width`-pixel-thick border in `hex_color` along the inner edge
+    of the character silhouette (character pixels that border the bg region).
+
+    Relies on `bg_mask` being the actual bg — if bg-fill bled into the
+    character, this border will bleed too. The generation side must produce
+    a hard-outlined character (LoRA at 0.95+) for the bg-mask to be clean.
+    """
+    import numpy as np
+    from scipy.ndimage import binary_dilation
+
+    arr = np.array(img.convert("RGB"))
+    char_mask = ~bg_mask
+    edge = binary_dilation(bg_mask, iterations=width) & char_mask
+    colour = np.array(
+        [int(hex_color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)], dtype=np.uint8
+    )
+    arr[edge] = colour
+    return Image.fromarray(arr)
+
+
 def _force_background_color(
     img: Image.Image, hex_color: str, tolerance: int
-) -> Image.Image:
+):
     """Flood-fill the background region from the image edges and replace it
     with `hex_color`. The 'background region' is every pixel connected to an
     edge whose colour is within `tolerance` (per-channel L1) of the sampled
@@ -72,13 +95,13 @@ def _force_background_color(
     # (restore the black outline), not here.
     labelled, _ = label(similar)
     if labelled.max() == 0:
-        return img
+        return img, None
 
     counts = np.bincount(labelled.ravel())
     counts[0] = 0
     max_count = int(counts.max())
     if max_count == 0:
-        return img
+        return img, None
 
     # Take edge-connected components large enough to plausibly *be* the bg
     # (handles bg-split-by-character as well as the single-blob case).
@@ -99,7 +122,7 @@ def _force_background_color(
     )
     out = arr.astype(np.uint8)
     out[bg_mask] = target
-    return Image.fromarray(out)
+    return Image.fromarray(out), bg_mask
 
 
 class ImageGenPipeline:
@@ -240,9 +263,13 @@ class ImageGenPipeline:
         image = output.images[0]
 
         if req.force_background_color:
-            image = _force_background_color(
+            image, bg_mask = _force_background_color(
                 image, req.force_background_color, req.background_tolerance
             )
+            if req.outline_color and bg_mask is not None:
+                image = _stroke_silhouette(
+                    image, bg_mask, req.outline_color, req.outline_width
+                )
 
         return GenerationResult(
             image=image,
