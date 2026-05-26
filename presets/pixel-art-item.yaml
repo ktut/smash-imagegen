@@ -31,21 +31,22 @@ vars:
     required: true
 
 prompt_template: |
-  solid pure lime green #00FF00 flat background, plain lime green backdrop, no scenery,
-  pixel, 16-bit pixel art game item sprite, retro game art style,
-  single isolated object, centred in frame, no character, no hands holding it,
-  {item_description},
-  bold thick black ink outlines on every shape, heavy contour lines, clean flat cell-shading,
-  vibrant saturated colours
+  pixel art icon of a single {item_description},
+  one object centred on a flat plain background, no scenery, no scene, no environment,
+  16-bit pixel art game item sprite, retro JRPG inventory icon, retro game art style,
+  bold thick black ink outlines on every shape, heavy contour lines,
+  clean flat cell-shading, vibrant saturated colours,
+  plain solid lime green #00FF00 background behind the object
 
 negative_prompt: |
   realistic photograph, 3d render, blurry, watermark, text, letters, signature, label text,
-  multiple items, multiple objects, collection, set, group,
+  multiple items, multiple objects, collection, set, group, pattern, tile, tiled, repeating,
+  brick wall, wall texture, ground texture, floor pattern, terrain texture, scene tile,
   character, person, hand, body, arm, fingers,
   scene background, environment, room, outdoor, indoor, ground, floor, table, surface,
   white background, black background, dark background, vignette, gradient background,
   cropped, cut off,
-  green colour on item, lime green on item,
+  green colour on item, lime green on item, green item, green object,
   lineless, soft edges, no outline, thin outlines, washed out colours
 
 defaults:
