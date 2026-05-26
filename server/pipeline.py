@@ -202,19 +202,16 @@ class ImageGenPipeline:
         # length are encoded correctly.
         from compel import Compel, ReturnedEmbeddingsType
         log.info("Building Compel (long-prompt encoder)")
-        # device='cpu' is important: enable_model_cpu_offload() keeps text
-        # encoders parked on CPU until the pipeline forwards through them via
-        # an accelerate hook. compel calls the encoders directly (bypassing
-        # the hook), so it must use the encoders on whichever device they
-        # actually live on — which is CPU. The pipeline will move the
-        # resulting prompt embeds to the GPU automatically.
+        # NOTE: enable_model_cpu_offload() parks the text encoders on CPU
+        # between forward passes via accelerate hooks. compel calls the
+        # encoders directly (bypassing the hook), so we have to manually
+        # move them to GPU around every encode call (see generate()).
         self._compel = Compel(
             tokenizer=[self.pipe.tokenizer, self.pipe.tokenizer_2],
             text_encoder=[self.pipe.text_encoder, self.pipe.text_encoder_2],
             returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
             requires_pooled=[False, True],
             truncate_long_prompts=False,
-            device="cpu",
         )
 
     # ------------------------------------------------------------------
@@ -263,8 +260,19 @@ class ImageGenPipeline:
             canny_scale = 0.0
 
         # ---- Encode prompts via compel (long-prompt safe) ----
-        conditioning, pooled = self._compel([req.prompt])
-        neg_conditioning, neg_pooled = self._compel([req.negative_prompt])
+        # enable_model_cpu_offload keeps the text encoders on CPU; compel
+        # bypasses the accelerate hook, so move them to GPU around the
+        # encode call and release them after. ~50 ms overhead total.
+        self.pipe.text_encoder.to(self.device)
+        self.pipe.text_encoder_2.to(self.device)
+        try:
+            conditioning, pooled = self._compel([req.prompt])
+            neg_conditioning, neg_pooled = self._compel([req.negative_prompt])
+        finally:
+            self.pipe.text_encoder.to("cpu")
+            self.pipe.text_encoder_2.to("cpu")
+            torch.cuda.empty_cache()
+
         # SDXL requires positive and negative conditioning tensors to be the
         # same length; compel pads the shorter one with empty tokens.
         conditioning, neg_conditioning = self._compel.pad_conditioning_tensors_to_same_length(
