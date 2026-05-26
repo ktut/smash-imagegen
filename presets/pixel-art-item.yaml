@@ -1,0 +1,66 @@
+# 16-bit pixel-art item sprite — projectiles, weapons, drinks, food, signs,
+# any standalone object that needs to read clearly when overlaid on a busy
+# game background.
+#
+# Single object, centred, on a chroma-key #00FF00 background with a hard 4px
+# black silhouette so it pops against any in-game backdrop.
+#
+# No pose or canny ControlNet by default (items have no body), and the IP-
+# Adapter reference is optional — most items can be generated from prompt
+# alone, but you can pass a real-world photo or a concept sketch via
+# --reference if you want a specific shape locked in.
+
+name: pixel-art-item
+description: |
+  16-bit pixel-art game item sprite. Single centred object on a chroma-key
+  green background with a hard black silhouette. Use for projectiles,
+  weapons, food, drinks, signs.
+
+requires_loras:
+  - pixel-art-xl
+
+vars:
+  - name: item_description
+    description: |
+      Freeform description of the item — colour, material, shape,
+      distinguishing features. Aim for 5-20 words. Examples:
+      "silver spray paint can with red cap"
+      "amber glass beer bottle with peeling white label"
+      "wide-brimmed sombrero with red blue and yellow trim"
+      "wooden baseball bat with leather grip"
+    required: true
+
+prompt_template: |
+  solid pure lime green #00FF00 flat background, plain lime green backdrop, no scenery,
+  pixel, 16-bit pixel art game item sprite, retro game art style,
+  single isolated object, centred in frame, no character, no hands holding it,
+  {item_description},
+  bold thick black ink outlines on every shape, heavy contour lines, clean flat cell-shading,
+  vibrant saturated colours
+
+negative_prompt: |
+  realistic photograph, 3d render, blurry, watermark, text, letters, signature, label text,
+  multiple items, multiple objects, collection, set, group,
+  character, person, hand, body, arm, fingers,
+  scene background, environment, room, outdoor, indoor, ground, floor, table, surface,
+  white background, black background, dark background, vignette, gradient background,
+  cropped, cut off,
+  green colour on item, lime green on item,
+  lineless, soft edges, no outline, thin outlines, washed out colours
+
+defaults:
+  reference_weight: 0.6           # ignored when no --reference is passed
+  pose_weight: 0.0
+  pose_extract: false
+  canny_weight: 0.0
+  canny_extract: false
+  steps: 150
+  guidance_scale: 11.0
+  width: 1024
+  height: 1024
+  lora_name: pixel-art-xl
+  lora_weight: 0.95
+  force_background_color: "#00FF00"
+  background_tolerance: 100
+  outline_color: "#000000"
+  outline_width: 4

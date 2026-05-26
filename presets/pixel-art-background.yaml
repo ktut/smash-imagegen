@@ -1,0 +1,56 @@
+# 16-bit pixel-art level/stage background. Wide aspect, no character, no
+# chroma-key — backgrounds *are* the background, so we don't post-process
+# them.
+#
+# Use for stage backdrops, scene art, level interiors and exteriors. Pass
+# a --canny reference if you have a layout sketch you want the model to
+# follow; otherwise leave canny disabled and let the prompt drive composition.
+
+name: pixel-art-background
+description: |
+  16-bit pixel-art level/stage background scene. Wide aspect ratio,
+  no character. For level backdrops and stage scenery.
+
+requires_loras:
+  - pixel-art-xl
+
+vars:
+  - name: scene_description
+    description: |
+      Freeform description of the scene — setting, time of day, key
+      visible elements, mood. Aim for 20-50 words. Examples:
+      "dimly lit medieval tavern interior, wooden beams, fireplace on
+       the left, long bar with stools on the right, hanging candle
+       chandeliers, warm orange firelight, scattered tables and mugs"
+      "sun-drenched volleyball beach at golden hour, soft yellow sand,
+       distant ocean horizon, a single net post in the centre frame,
+       wispy clouds, low sun casting long shadows"
+    required: true
+
+prompt_template: |
+  16-bit pixel art game background scene, retro JRPG stage backdrop, retro game art style,
+  {scene_description},
+  no characters, no people, environment only,
+  rich scene detail, vibrant saturated colours, clean flat cell-shading,
+  layered depth — foreground midground background
+
+negative_prompt: |
+  realistic photograph, 3d render, blurry, watermark, text, letters, signature,
+  characters, people, person, human figure, npc, animals, wildlife,
+  cropped, cut off,
+  washed out colours, low contrast, monochrome,
+  pure solid colour background, blank background, empty scene
+
+defaults:
+  reference_weight: 0.0           # backgrounds usually generated from prompt
+  pose_weight: 0.0
+  pose_extract: false
+  canny_weight: 0.7               # used IF --canny is passed (layout sketch)
+  canny_extract: true
+  steps: 150
+  guidance_scale: 10.0
+  width: 1344                     # 16:9, SDXL-friendly aspect
+  height: 768
+  lora_name: pixel-art-xl
+  lora_weight: 0.9
+  # No force_background_color or outline — backgrounds aren't chroma-keyed

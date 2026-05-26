@@ -142,13 +142,17 @@ class PresetRegistry:
     def __init__(self, presets_dir: Path):
         self.presets_dir = presets_dir
         self._presets: dict[str, Preset] = {}
+        self._mtime_signature: tuple = ()
         self.reload()
 
     def reload(self) -> None:
         self._presets.clear()
         if not self.presets_dir.exists():
+            self._mtime_signature = ()
             return
-        for path in sorted(self.presets_dir.glob("*.yaml")):
+        paths = sorted(self.presets_dir.glob("*.yaml"))
+        self._mtime_signature = tuple((p.name, p.stat().st_mtime) for p in paths)
+        for path in paths:
             try:
                 preset = Preset.from_yaml(path)
             except Exception as e:  # noqa: BLE001 — log + skip, don't crash boot
@@ -159,10 +163,27 @@ class PresetRegistry:
                 continue
             self._presets[preset.name] = preset
 
+    def _reload_if_changed(self) -> None:
+        """Reload if any preset file's mtime changed (or files appeared/vanished).
+        Lets the user drop new YAMLs into presets/ without restarting the server.
+        """
+        if not self.presets_dir.exists():
+            if self._mtime_signature:
+                self.reload()
+            return
+        sig = tuple(
+            (p.name, p.stat().st_mtime)
+            for p in sorted(self.presets_dir.glob("*.yaml"))
+        )
+        if sig != self._mtime_signature:
+            self.reload()
+
     def list(self) -> list[Preset]:
+        self._reload_if_changed()
         return list(self._presets.values())
 
     def get(self, name: str) -> Preset:
+        self._reload_if_changed()
         if name not in self._presets:
             raise KeyError(name)
         return self._presets[name]
