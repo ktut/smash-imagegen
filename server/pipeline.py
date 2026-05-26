@@ -53,7 +53,7 @@ def _force_background_color(
     that. Implemented with scipy.ndimage.label for O(n) component finding.
     """
     import numpy as np
-    from scipy.ndimage import label, binary_erosion, binary_dilation
+    from scipy.ndimage import label
 
     arr = np.array(img.convert("RGB")).astype(np.int16)
     h, w, _ = arr.shape
@@ -64,34 +64,35 @@ def _force_background_color(
     diff = np.abs(arr - seed).sum(axis=2)
     similar = diff < tolerance
 
-    # The model produces a thin "halo" of anti-aliased pixels around the
-    # character whose colour is within `tolerance` of the bg corner colour.
-    # Without intervention this halo chains through narrow bridges into
-    # small interior matches (a green pixel inside a spray can, a pocket
-    # shadow that happens to be greenish) and makes the whole thing one
-    # giant edge-connected component — so the area heuristic green-lights
-    # filling pixels deep inside the character.
-    #
-    # Snap the bridges: erode `similar` by 2 pixels, label the eroded mask
-    # to find the true bg core, then dilate that core back by 2 pixels and
-    # intersect with the original `similar` to recover the bg boundary.
-    eroded = binary_erosion(similar, iterations=2)
-    labelled, _ = label(eroded)
-
+    # Simple connected-components flood-fill. Relies on the *generation* side
+    # producing hard black outlines around the character (LoRA at 0.95+ does
+    # this) — black is L1 ~360 from pure green, so the flood-fill cannot
+    # cross an outlined boundary even at high tolerance. If you find the
+    # post-process eating character pixels, the fix is in generation
+    # (restore the black outline), not here.
+    labelled, _ = label(similar)
     if labelled.max() == 0:
         return img
 
     counts = np.bincount(labelled.ravel())
-    counts[0] = 0  # the "non-similar" label
+    counts[0] = 0
     max_count = int(counts.max())
     if max_count == 0:
         return img
 
-    bg_label_ids = np.where(counts >= max_count * 0.25)[0]
-    bg_label_ids = bg_label_ids[bg_label_ids != 0]
-    bg_core = np.isin(labelled, list(bg_label_ids))
+    # Take edge-connected components large enough to plausibly *be* the bg
+    # (handles bg-split-by-character as well as the single-blob case).
+    edge_labels = set()
+    edge_labels.update(np.unique(labelled[0, :]).tolist())
+    edge_labels.update(np.unique(labelled[-1, :]).tolist())
+    edge_labels.update(np.unique(labelled[:, 0]).tolist())
+    edge_labels.update(np.unique(labelled[:, -1]).tolist())
+    edge_labels.discard(0)
 
-    bg_mask = binary_dilation(bg_core, iterations=2) & similar
+    bg_labels = [
+        lbl for lbl in edge_labels if counts[lbl] >= max_count * 0.25
+    ]
+    bg_mask = np.isin(labelled, bg_labels)
 
     target = np.array(
         [int(hex_color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)], dtype=np.uint8
