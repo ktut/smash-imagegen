@@ -202,12 +202,19 @@ class ImageGenPipeline:
         # length are encoded correctly.
         from compel import Compel, ReturnedEmbeddingsType
         log.info("Building Compel (long-prompt encoder)")
+        # device='cpu' is important: enable_model_cpu_offload() keeps text
+        # encoders parked on CPU until the pipeline forwards through them via
+        # an accelerate hook. compel calls the encoders directly (bypassing
+        # the hook), so it must use the encoders on whichever device they
+        # actually live on — which is CPU. The pipeline will move the
+        # resulting prompt embeds to the GPU automatically.
         self._compel = Compel(
             tokenizer=[self.pipe.tokenizer, self.pipe.tokenizer_2],
             text_encoder=[self.pipe.text_encoder, self.pipe.text_encoder_2],
             returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
             requires_pooled=[False, True],
             truncate_long_prompts=False,
+            device="cpu",
         )
 
     # ------------------------------------------------------------------
