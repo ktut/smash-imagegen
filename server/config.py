@@ -13,6 +13,7 @@ class Config:
     base_model: str
     vae_model: str
     controlnet_openpose_model: str
+    controlnet_canny_model: str
     ip_adapter_repo: str
     ip_adapter_subfolder: str
     ip_adapter_weight_name: str
@@ -35,6 +36,7 @@ def load_config(path: Path) -> Config:
         base_model=data["base_model"],
         vae_model=data["vae_model"],
         controlnet_openpose_model=data["controlnet_openpose_model"],
+        controlnet_canny_model=data["controlnet_canny_model"],
         ip_adapter_repo=data["ip_adapter"]["repo"],
         ip_adapter_subfolder=data["ip_adapter"]["subfolder"],
         ip_adapter_weight_name=data["ip_adapter"]["weight_name"],

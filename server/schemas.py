@@ -46,6 +46,21 @@ class GenerateRequest(BaseModel):
     )
     pose_weight: float = Field(default=0.9, ge=0.0, le=2.0)
 
+    # ---- Canny edge control (second ControlNet, optional) ----
+    # When supplied, this lets the caller lock the silhouette/edges of a
+    # reference image (e.g. an existing pixel-art sprite) on top of the
+    # OpenPose skeleton. The two control signals are combined via a
+    # MultiControlNetModel inside the pipeline.
+    canny_image: Optional[str] = Field(
+        default=None,
+        description="Base64-encoded image to use as a Canny edge reference, or a pre-made edge map.",
+    )
+    canny_extract: bool = Field(
+        default=True,
+        description="If True, run a Canny edge detector on canny_image first.",
+    )
+    canny_weight: float = Field(default=0.5, ge=0.0, le=2.0)
+
     # ---- LoRA ----
     lora_name: Optional[str] = Field(
         default=None,

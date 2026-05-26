@@ -46,6 +46,7 @@ class ImageGenPipeline:
         from diffusers import (
             AutoencoderKL,
             ControlNetModel,
+            MultiControlNetModel,
             StableDiffusionXLControlNetPipeline,
         )
 
@@ -58,9 +59,19 @@ class ImageGenPipeline:
         vae = AutoencoderKL.from_pretrained(config.vae_model, torch_dtype=torch.float16)
 
         log.info("Loading ControlNet (OpenPose): %s", config.controlnet_openpose_model)
-        controlnet = ControlNetModel.from_pretrained(
+        controlnet_openpose = ControlNetModel.from_pretrained(
             config.controlnet_openpose_model, torch_dtype=torch.float16
         )
+
+        log.info("Loading ControlNet (Canny): %s", config.controlnet_canny_model)
+        controlnet_canny = ControlNetModel.from_pretrained(
+            config.controlnet_canny_model, torch_dtype=torch.float16
+        )
+
+        # MultiControlNet — at inference we pass [openpose_img, canny_img] and
+        # [openpose_scale, canny_scale]. A scale of 0 effectively disables one
+        # branch (we still need to pass a placeholder image in that slot).
+        controlnet = MultiControlNetModel([controlnet_openpose, controlnet_canny])
 
         log.info("Loading base model: %s", config.base_model)
         self.pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
@@ -92,8 +103,9 @@ class ImageGenPipeline:
         except Exception:
             log.info("xformers not available, using default attention")
 
-        # Pose detector loaded lazily on first pose-extraction request
+        # Detectors loaded lazily on first request that needs them
         self._pose_detector = None
+        self._canny_detector = None
 
         # Track currently-loaded LoRA so we don't reload unnecessarily
         self._current_lora: Optional[tuple[str, float]] = None
@@ -118,33 +130,44 @@ class ImageGenPipeline:
             self.pipe.set_ip_adapter_scale(0.0)
             ip_adapter_image = None
 
-        # ---- ControlNet (pose) ----
-        # The SDXL ControlNet pipeline requires a control image. If the request
-        # has no pose, we pass a blank image with controlnet_conditioning_scale=0
-        # to effectively disable it.
+        # ---- ControlNets (pose + canny) ----
+        # MultiControlNet expects parallel lists of images and scales. A scale
+        # of 0 disables that branch, but we still pass a placeholder image.
+        blank = Image.new("RGB", (req.width, req.height), color="black")
+
         if req.pose_image:
             pose_input = _decode_b64(req.pose_image)
             if req.pose_extract:
                 pose_input = self._extract_pose(pose_input)
-            control_image = pose_input.resize((req.width, req.height))
-            controlnet_scale = req.pose_weight
+            pose_control = pose_input.resize((req.width, req.height))
+            pose_scale = req.pose_weight
         else:
-            control_image = Image.new("RGB", (req.width, req.height), color="black")
-            controlnet_scale = 0.0
+            pose_control = blank
+            pose_scale = 0.0
+
+        if req.canny_image:
+            canny_input = _decode_b64(req.canny_image)
+            if req.canny_extract:
+                canny_input = self._extract_canny(canny_input)
+            canny_control = canny_input.resize((req.width, req.height))
+            canny_scale = req.canny_weight
+        else:
+            canny_control = blank
+            canny_scale = 0.0
 
         log.info(
-            "Generating: seed=%d, steps=%d, ip_weight=%.2f, pose_weight=%.2f, lora=%s",
+            "Generating: seed=%d, steps=%d, ip_weight=%.2f, pose_weight=%.2f, canny_weight=%.2f, lora=%s",
             seed, req.steps,
             req.reference_weight if req.reference_image else 0.0,
-            controlnet_scale,
+            pose_scale, canny_scale,
             req.lora_name or "<none>",
         )
 
         output = self.pipe(
             prompt=req.prompt,
             negative_prompt=req.negative_prompt,
-            image=control_image,
-            controlnet_conditioning_scale=controlnet_scale,
+            image=[pose_control, canny_control],
+            controlnet_conditioning_scale=[pose_scale, canny_scale],
             ip_adapter_image=ip_adapter_image,
             num_inference_steps=req.steps,
             guidance_scale=req.guidance_scale,
@@ -174,6 +197,15 @@ class ImageGenPipeline:
                 self.config.pose_detector_repo
             )
         return self._pose_detector(image)
+
+    def _extract_canny(self, image: Image.Image) -> Image.Image:
+        """Run Canny edge detector on an image to produce an edge map."""
+        if self._canny_detector is None:
+            from controlnet_aux import CannyDetector
+
+            log.info("Loading Canny detector (first request)")
+            self._canny_detector = CannyDetector()
+        return self._canny_detector(image)
 
     def _ensure_lora(self, name: Optional[str], weight: float) -> None:
         """Load (or swap, or unload) a LoRA on demand."""

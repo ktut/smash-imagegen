@@ -18,6 +18,11 @@ vae_model: madebyollin/sdxl-vae-fp16-fix
 # ControlNet for SDXL as of 2025.
 controlnet_openpose_model: xinsir/controlnet-openpose-sdxl-1.0
 
+# Canny edge ControlNet. Loaded alongside OpenPose in a MultiControlNetModel
+# so requests can supply both a pose skeleton and an edge silhouette
+# (useful for locking held objects and overall character outline).
+controlnet_canny_model: xinsir/controlnet-canny-sdxl-1.0
+
 # IP-Adapter for identity reference (the nano-banana analog).
 # "Plus" variants give stronger image conditioning than the base.
 ip_adapter:
