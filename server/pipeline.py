@@ -53,7 +53,7 @@ def _force_background_color(
     that. Implemented with scipy.ndimage.label for O(n) component finding.
     """
     import numpy as np
-    from scipy.ndimage import label
+    from scipy.ndimage import label, binary_erosion, binary_dilation
 
     arr = np.array(img.convert("RGB")).astype(np.int16)
     h, w, _ = arr.shape
@@ -64,33 +64,34 @@ def _force_background_color(
     diff = np.abs(arr - seed).sum(axis=2)
     similar = diff < tolerance
 
-    labelled, _ = label(similar)
-    edge_labels = set()
-    edge_labels.update(np.unique(labelled[0, :]).tolist())
-    edge_labels.update(np.unique(labelled[-1, :]).tolist())
-    edge_labels.update(np.unique(labelled[:, 0]).tolist())
-    edge_labels.update(np.unique(labelled[:, -1]).tolist())
-    edge_labels.discard(0)
+    # The model produces a thin "halo" of anti-aliased pixels around the
+    # character whose colour is within `tolerance` of the bg corner colour.
+    # Without intervention this halo chains through narrow bridges into
+    # small interior matches (a green pixel inside a spray can, a pocket
+    # shadow that happens to be greenish) and makes the whole thing one
+    # giant edge-connected component — so the area heuristic green-lights
+    # filling pixels deep inside the character.
+    #
+    # Snap the bridges: erode `similar` by 2 pixels, label the eroded mask
+    # to find the true bg core, then dilate that core back by 2 pixels and
+    # intersect with the original `similar` to recover the bg boundary.
+    eroded = binary_erosion(similar, iterations=2)
+    labelled, _ = label(eroded)
 
-    # The background is whichever edge-connected components are large enough
-    # to plausibly *be* the background. Take any edge-connected component
-    # whose area is at least 25% of the largest edge-connected component.
-    # This handles:
-    #   • single bg blob wrapping the character          → 1 component dominates
-    #   • bg split into left/right by the character      → 2 large components
-    #   • small character bits that happen to touch edge → filtered out (too small)
-    # The previous "centre-strip guard" failed because real bgs reach into
-    # the centre through gaps in the character (between legs, arm-and-body).
-    if edge_labels:
-        counts = np.bincount(labelled.ravel())
-        max_area = max(int(counts[lbl]) for lbl in edge_labels)
-        bg_labels = {
-            lbl for lbl in edge_labels if counts[lbl] >= max_area * 0.25
-        }
-    else:
-        bg_labels = set()
+    if labelled.max() == 0:
+        return img
 
-    bg_mask = np.isin(labelled, list(bg_labels))
+    counts = np.bincount(labelled.ravel())
+    counts[0] = 0  # the "non-similar" label
+    max_count = int(counts.max())
+    if max_count == 0:
+        return img
+
+    bg_label_ids = np.where(counts >= max_count * 0.25)[0]
+    bg_label_ids = bg_label_ids[bg_label_ids != 0]
+    bg_core = np.isin(labelled, list(bg_label_ids))
+
+    bg_mask = binary_dilation(bg_core, iterations=2) & similar
 
     target = np.array(
         [int(hex_color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)], dtype=np.uint8
