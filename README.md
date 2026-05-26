@@ -1,27 +1,67 @@
 # smash-imagegen
 
-Local image generation server for the `smash` game project. Runs on a Windows PC
-with an NVIDIA GPU and exposes a simple HTTP API for character sprites,
-projectiles, and items.
+Personal self-hosted image-gen harness. Runs an SDXL + IP-Adapter +
+ControlNet + LoRA pipeline on a Windows PC's GPU and exposes a small HTTP API
+so any client on the LAN (Mac, phone shortcut, another laptop) can generate
+images without paying per-image API fees or spinning up a UI.
 
-The intent is to replace per-image API costs (nano banana / Gemini) with
-unlimited local generation, while keeping reference-image and pose-control
-parity through **IP-Adapter** and **ControlNet**.
+**Curated presets** mean you don't have to remember 14 parameters per use case.
+Pick a preset by name, supply a reference image + a one-line description,
+get the image. Add new presets by dropping a YAML file in `presets/`.
+
+The repo started as a sprite pipeline for one specific game project, but the
+server and presets are project-agnostic — bring your own reference photos and
+your own preset YAMLs.
 
 ## Architecture
 
 ```
-  Mac (or PC) ──HTTP──►  Windows PC (RTX 4080 Super)
-                         ├── FastAPI server (this repo)
-                         ├── diffusers pipeline
-                         │     ├── SDXL base
-                         │     ├── ControlNet OpenPose (pose)
-                         │     └── IP-Adapter Plus (identity)
-                         └── outputs/  (PNG + JSON sidecar per image)
+  Any client ──HTTP──►  Windows PC (NVIDIA GPU)
+                        ├── FastAPI server (this repo)
+                        ├── diffusers pipeline
+                        │     ├── SDXL base
+                        │     ├── ControlNet OpenPose + Canny  (structure)
+                        │     ├── IP-Adapter Plus              (identity)
+                        │     └── any LoRA from loras/         (style)
+                        ├── presets/<name>.yaml                (curated recipes)
+                        └── outputs/  (PNG + JSON sidecar per image)
 ```
 
-Single process, single GPU, single model loaded once at startup and held in VRAM.
-All configuration is in `config.yaml` — there is no UI.
+Single process, single GPU, models loaded once at startup and held in VRAM.
+All configuration is in `config.yaml` and `presets/`. There is no UI.
+
+## Quickstart — presets (the recommended path)
+
+From any machine that can reach the server:
+
+```bash
+# What presets are available?
+python scripts/cli.py list
+
+# What does this preset want from me?
+python scripts/cli.py show pixel-art-character
+
+# Generate. The preset bundles every generation parameter; you only
+# supply the images and any preset-defined template variables.
+python scripts/cli.py run pixel-art-character \
+    --reference  photo.jpg \
+    --pose       walk-pose.png \
+    --canny      walk-pose.png \
+    --var character_description="bald man, leather jacket, brown boots" \
+    --candidates 4 \
+    --out        ./out/
+```
+
+The first preset that ships, `pixel-art-character`, turns a real photo into
+a chunky 16-bit pixel-art sprite walking right on a chroma-key `#00FF00`
+background with a hard 4 px black silhouette. Use it as a template for your
+own presets — copy `presets/pixel-art-character.yaml`, change the prompt and
+defaults, drop it in `presets/`, and the server picks it up on next restart.
+
+## Direct (no-preset) usage
+
+If you want fine-grained control, use the `raw` subcommand or post directly
+to `/generate`. See `python scripts/cli.py raw --help` for the flag set.
 
 ---
 

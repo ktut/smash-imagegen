@@ -114,6 +114,60 @@ class GenerateResponse(BaseModel):
     saved_path: str
 
 
+# ---------------------------------------------------------------------------
+# Preset endpoints
+# ---------------------------------------------------------------------------
+
+
+class PresetVarInfo(BaseModel):
+    name: str
+    description: str = ""
+    required: bool = True
+    default: Optional[str] = None
+
+
+class PresetInfo(BaseModel):
+    """Public-facing preset metadata, served by /presets and /presets/{name}."""
+    name: str
+    description: str
+    vars: list[PresetVarInfo]
+    requires_loras: list[str]
+    defaults: dict
+    prompt_template: str
+    negative_prompt: str
+
+
+class PresetListResponse(BaseModel):
+    presets: list[PresetInfo]
+
+
+class GenerateFromPresetRequest(BaseModel):
+    """Generate using a named preset.
+
+    The preset supplies the prompt, negative prompt, and every generation
+    parameter. The caller supplies the images, any template variable values,
+    and (optionally) per-call overrides like `seed` or `steps`.
+    """
+    preset: str = Field(..., description="Preset name (the YAML filename without .yaml)")
+    vars: dict = Field(
+        default_factory=dict,
+        description="Values for the preset's named template variables.",
+    )
+    overrides: dict = Field(
+        default_factory=dict,
+        description=(
+            "Direct GenerateRequest field overrides. Any key here wins over "
+            "the preset's defaults. Use for per-call seed, steps, or any knob "
+            "you want to tweak without editing the preset YAML."
+        ),
+    )
+
+    reference_image: Optional[str] = None
+    pose_image: Optional[str] = None
+    canny_image: Optional[str] = None
+    seed: int = -1
+
+
 class HealthResponse(BaseModel):
     status: str
     device: Optional[str] = None

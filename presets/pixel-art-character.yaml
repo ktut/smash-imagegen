@@ -1,0 +1,73 @@
+# Convert a real photo of a person into a chunky 16-bit pixel-art character
+# sprite, walking right, on a chroma-key #00FF00 background with a hard 4px
+# black silhouette.
+#
+# Recipe distilled from a long iteration session against a Gemini reference:
+# the LoRA does most of the style work, Canny locks the silhouette, the
+# server-side post-process guarantees a clean bg and a uniform outline so
+# the sprite pops cleanly off any in-game background.
+#
+# Inputs you pass at generation time:
+#   • reference_image  — real photo of the person (preferably head + torso)
+#   • pose_image       — any existing sprite-shaped image to use as the pose
+#                        skeleton + canny silhouette source (we feed the same
+#                        image to both OpenPose and Canny ControlNets)
+#   • vars.character_description — short freeform description of clothing /
+#                                  build / distinguishing features, baked
+#                                  into the prompt template
+
+name: pixel-art-character
+description: |
+  Photo → 16-bit pixel-art character sprite, walking right, on a chroma-key
+  green background with a hard black silhouette outline.
+
+requires_loras:
+  - pixel-art-xl
+
+vars:
+  - name: character_description
+    description: |
+      Short freeform description of clothing, build, hair, distinguishing
+      features. Goes mid-prompt. Aim for 10-30 words. Example:
+      "young woman, long wavy blonde hair, blue purple hoodie, brown cargo
+      pants, grey sneakers, holding a silver spray paint can"
+    required: true
+
+prompt_template: |
+  solid pure lime green #00FF00 flat background, plain lime green backdrop, no scenery,
+  pixel, 16-bit pixel art JRPG fighting game character sprite, anime style pixel art, retro game art style
+  FULL BODY visible — head, torso, arms, legs, feet all in frame, nothing cropped
+  side profile facing RIGHT, character centred in frame with space above head and below feet
+  {character_description}
+  bold thick black ink outlines on every shape, heavy contour lines, clean flat cell-shading
+  mid-stride walking pose, one leg forward, opposite arm swinging, dynamic walking motion
+
+negative_prompt: |
+  realistic photograph, 3d render, blurry, watermark, text, letters, signature, label,
+  garbled text, gibberish text,
+  multiple characters, extra limbs, deformed, distorted, mutated,
+  photorealistic face, smooth shading, gradients on skin, painted illustration,
+  scene background, environment, room, outdoor, indoor, ground, floor,
+  white background, black background, dark background, vignette, dark shadows behind character, gradient background, transparent background,
+  cropped, cut off, partial body, missing feet, missing legs, missing head, portrait only,
+  facing left, zoomed in, close-up,
+  green clothing, green shoes, green pants, green shirt, green skin, lime green on character body, any green colour on character,
+  lineless, soft edges, no outline, thin outlines, washed out colours, low contrast, pastel colours,
+  tiny features, cute chibi face, baby face, anime moe
+
+defaults:
+  reference_weight: 0.9
+  pose_weight: 0.9
+  pose_extract: true
+  canny_weight: 1.1
+  canny_extract: true
+  steps: 150
+  guidance_scale: 12.0
+  width: 1024
+  height: 1536
+  lora_name: pixel-art-xl
+  lora_weight: 0.95
+  force_background_color: "#00FF00"
+  background_tolerance: 100
+  outline_color: "#000000"
+  outline_width: 4
