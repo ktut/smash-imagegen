@@ -195,6 +195,21 @@ class ImageGenPipeline:
         # Track currently-loaded LoRA so we don't reload unnecessarily
         self._current_lora: Optional[tuple[str, float]] = None
 
+        # Compel — long-prompt encoder. SDXL's CLIP truncates at 77 tokens
+        # per encoder by default, silently dropping the tail of any longer
+        # prompt. compel chunks the input, encodes each chunk through both
+        # text encoders, and concatenates the results so prompts of any
+        # length are encoded correctly.
+        from compel import Compel, ReturnedEmbeddingsType
+        log.info("Building Compel (long-prompt encoder)")
+        self._compel = Compel(
+            tokenizer=[self.pipe.tokenizer, self.pipe.tokenizer_2],
+            text_encoder=[self.pipe.text_encoder, self.pipe.text_encoder_2],
+            returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
+            requires_pooled=[False, True],
+            truncate_long_prompts=False,
+        )
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -240,17 +255,29 @@ class ImageGenPipeline:
             canny_control = blank
             canny_scale = 0.0
 
+        # ---- Encode prompts via compel (long-prompt safe) ----
+        conditioning, pooled = self._compel([req.prompt])
+        neg_conditioning, neg_pooled = self._compel([req.negative_prompt])
+        # SDXL requires positive and negative conditioning tensors to be the
+        # same length; compel pads the shorter one with empty tokens.
+        conditioning, neg_conditioning = self._compel.pad_conditioning_tensors_to_same_length(
+            [conditioning, neg_conditioning]
+        )
+
         log.info(
-            "Generating: seed=%d, steps=%d, ip_weight=%.2f, pose_weight=%.2f, canny_weight=%.2f, lora=%s",
+            "Generating: seed=%d, steps=%d, ip_weight=%.2f, pose_weight=%.2f, canny_weight=%.2f, lora=%s, prompt_tokens=%d",
             seed, req.steps,
             req.reference_weight if req.reference_image else 0.0,
             pose_scale, canny_scale,
             req.lora_name or "<none>",
+            conditioning.shape[1],
         )
 
         output = self.pipe(
-            prompt=req.prompt,
-            negative_prompt=req.negative_prompt,
+            prompt_embeds=conditioning,
+            pooled_prompt_embeds=pooled,
+            negative_prompt_embeds=neg_conditioning,
+            negative_pooled_prompt_embeds=neg_pooled,
             image=[pose_control, canny_control],
             controlnet_conditioning_scale=[pose_scale, canny_scale],
             ip_adapter_image=ip_adapter_image,
