@@ -199,7 +199,13 @@ class ImageGenPipeline:
                 self._current_lora = None
                 raise FileNotFoundError(f"LoRA not found: {lora_path}")
             log.info("Loading LoRA: %s (scale=%.2f)", name, weight)
-            self.pipe.load_lora_weights(str(lora_path))
+            # Pass parent directory + explicit weight_name. Passing a full .safetensors
+            # path makes diffusers fall through to its HF-repo path which errors with
+            # "When using the offline mode, you must specify a `weight_name`."
+            self.pipe.load_lora_weights(
+                str(lora_path.parent),
+                weight_name=lora_path.name,
+            )
             self.pipe.fuse_lora(lora_scale=weight)
 
         self._current_lora = target
