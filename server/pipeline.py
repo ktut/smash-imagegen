@@ -40,6 +40,48 @@ def _encode_b64(img: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
+def _force_background_color(
+    img: Image.Image, hex_color: str, tolerance: int
+) -> Image.Image:
+    """Flood-fill the background region from the image edges and replace it
+    with `hex_color`. The 'background region' is every pixel connected to an
+    edge whose colour is within `tolerance` (per-channel L1) of the sampled
+    average corner colour.
+
+    Pure threshold replacement would clobber any character pixel that happens
+    to match the bg colour; restricting to edge-connected components avoids
+    that. Implemented with scipy.ndimage.label for O(n) component finding.
+    """
+    import numpy as np
+    from scipy.ndimage import label
+
+    arr = np.array(img.convert("RGB")).astype(np.int16)
+    h, w, _ = arr.shape
+
+    corners = np.stack([arr[0, 0], arr[0, w - 1], arr[h - 1, 0], arr[h - 1, w - 1]])
+    seed = corners.mean(axis=0)
+
+    diff = np.abs(arr - seed).sum(axis=2)
+    similar = diff < tolerance
+
+    labelled, _ = label(similar)
+    edge_labels = set()
+    edge_labels.update(np.unique(labelled[0, :]).tolist())
+    edge_labels.update(np.unique(labelled[-1, :]).tolist())
+    edge_labels.update(np.unique(labelled[:, 0]).tolist())
+    edge_labels.update(np.unique(labelled[:, -1]).tolist())
+    edge_labels.discard(0)
+
+    bg_mask = np.isin(labelled, list(edge_labels))
+
+    target = np.array(
+        [int(hex_color.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)], dtype=np.uint8
+    )
+    out = arr.astype(np.uint8)
+    out[bg_mask] = target
+    return Image.fromarray(out)
+
+
 class ImageGenPipeline:
     def __init__(self, config: Config):
         # Lazy heavy imports so module-level errors are easier to read
@@ -176,6 +218,11 @@ class ImageGenPipeline:
             generator=generator,
         )
         image = output.images[0]
+
+        if req.force_background_color:
+            image = _force_background_color(
+                image, req.force_background_color, req.background_tolerance
+            )
 
         return GenerationResult(
             image=image,

@@ -68,6 +68,23 @@ class GenerateRequest(BaseModel):
     )
     lora_weight: float = Field(default=0.8, ge=0.0, le=2.0)
 
+    # ---- Post-process ----
+    force_background_color: Optional[str] = Field(
+        default=None,
+        description=(
+            "If set (e.g. '#00FF00'), the server runs a BFS flood-fill from the "
+            "image edges and replaces every pixel connected to the corners (i.e. "
+            "the background region) with this exact color. Guarantees a uniform, "
+            "chroma-key-friendly background regardless of model bias."
+        ),
+    )
+    background_tolerance: int = Field(
+        default=60,
+        ge=0,
+        le=255,
+        description="Per-channel tolerance for the flood-fill match against the sampled corner colour.",
+    )
+
     # ---- Generation params ----
     seed: int = Field(default=-1, description="-1 for random")
     steps: int = Field(default=30, ge=1, le=150)

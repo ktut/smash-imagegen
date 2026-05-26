@@ -17,6 +17,8 @@ pydantic>=2.8.0
 
 # Image + config
 Pillow>=10.4.0
+numpy>=1.26.0
+scipy>=1.13.0         # ndimage.label for background flood-fill post-process
 PyYAML>=6.0.2
 
 # CLI client (used by scripts/cli.py from either machine)
