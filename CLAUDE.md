@@ -29,6 +29,29 @@ saved to `outputs/` with a JSON sidecar, plus base64 returned in the response.
    nano-banana's "use this as a reference" behavior. IP-Adapter tuning is the
    most important knob.
 
+## Delivering results to the user — required output format
+
+**Whenever the user asks for multiple items or an animation, the response
+MUST include all three of:**
+
+1. The composite artefact (animated WebP for animations, contact sheet for
+   batches) hosted at a temporary public URL.
+2. A labelled contact sheet — every frame in a grid, each annotated with
+   its frame number, varied parameter (angle / pose / seed / etc.), and
+   anything else relevant to giving feedback.
+3. Per-frame hosted URLs in a labelled list, so the user can reference a
+   single frame by name when giving feedback (e.g. "frame 3 has a green
+   bleed at the bottom").
+
+Use catbox.moe (`https://catbox.moe/user/api.php`) as the host — it's
+been verified working and gives stable direct-image URLs. Do NOT just
+paste image content into the response or save only locally; the user
+is frequently on a remote control session and cannot see local files.
+
+This rule applies even for ad-hoc test generations and one-off
+experiments — anywhere multiple frames would benefit from per-frame
+feedback. Single one-off images don't need the contact-sheet treatment.
+
 ## How to make changes
 
 - **All configuration is in `config.yaml`.** Don't hardcode model names in
