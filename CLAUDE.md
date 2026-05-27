@@ -29,6 +29,35 @@ saved to `outputs/` with a JSON sidecar, plus base64 returned in the response.
    nano-banana's "use this as a reference" behavior. IP-Adapter tuning is the
    most important knob.
 
+## Generating animations or multi-view sets — two-stage rule
+
+Any time you generate **multiple frames of the same subject** — an
+animation, a rotation, a pose set, a sprite sheet — you MUST use a
+two-stage workflow:
+
+1. **Stage 1: produce one canonical reference image** of the subject
+   (the gem at its default orientation, the character standing, etc.).
+   Get this single image looking right before generating any frames.
+2. **Stage 2: generate every frame using that canonical image as the
+   IP-Adapter `reference_image`**. This locks the subject's identity
+   across frames so it looks like the same gem rotating, not eight
+   unrelated gems.
+
+If you skip stage 1 and just generate N frames with N different seeds,
+each frame will be a separately-imagined subject — the user gets eight
+different gems instead of one gem rotating. Do not ship that result.
+
+For 3D rotation specifically: use a moderate `reference_weight`
+(~0.6-0.7, not 1.0) so the model can interpret "rotated 90 degrees"
+while keeping identity. Higher weights lock the view angle too tightly
+and the rotation prompt is ignored.
+
+This mirrors the Gemini two-stage flow documented in the smash-client
+CLAUDE.md (real photo → stand sprite → pose sprites). The same pattern
+applies to SDXL via the harness: call the preset once with no reference
+to get a canonical, then call N more times with the canonical passed as
+`--reference`.
+
 ## Delivering results to the user — required output format
 
 **Whenever the user asks for multiple items or an animation, the response
