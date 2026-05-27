@@ -16,6 +16,13 @@ description: |
   green background with a hard black silhouette. Use for projectiles,
   weapons, food, drinks, signs.
 
+  EXPERIMENTAL — works best when you pass `--reference <photo-of-object>`
+  so IP-Adapter locks the silhouette. Prompt-only generation is unreliable
+  here: pixel-art-xl has strong sprite-sheet priors and frequently produces
+  a tiled grid of items instead of a single one. A reference photo is the
+  cleanest fix; absent one, see notes in the YAML for prompt patterns that
+  reduce (but don't eliminate) the multiplication.
+
 requires_loras:
   - pixel-art-xl
 
@@ -52,7 +59,7 @@ negative_prompt: |
   lineless, soft edges, no outline, thin outlines, washed out colours
 
 defaults:
-  reference_weight: 0.6           # ignored when no --reference is passed
+  reference_weight: 0.9           # tuned for the with-reference case
   pose_weight: 0.0
   pose_extract: false
   canny_weight: 0.0
@@ -62,7 +69,9 @@ defaults:
   width: 1024
   height: 1024
   lora_name: pixel-art-xl
-  lora_weight: 0.95
+  lora_weight: 0.6                # lower than character preset — at 0.95 the
+                                  # sprite-sheet prior wins over single-object
+                                  # prompting unless IP-Adapter is also active
   force_background_color: "#00FF00"
   background_tolerance: 100
   outline_color: "#000000"
